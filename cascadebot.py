@@ -21,29 +21,30 @@ Fill in the parameters below, and then run it with:
 """
 from decimal import Decimal
 from datetime import datetime, timedelta
+import config
 
 # API key stuff
-BITFINEX_API_KEY = "API_KEY_GOES_HERE"
-BITFINEX_API_SECRET = b"API_SECRET_GOES_HERE"
+BITFINEX_API_KEY = config.BITFINEX_API_KEY
+BITFINEX_API_SECRET = config.BITFINEX_API_SECRET
 
 # Set this to False if you don't want the bot to make USD offers
-LEND_USD = True
+LEND_USD = config.LEND_USD
 
 # Set this to False if you don't want the bot to make BTC offers
-LEND_BTC = True
+LEND_BTC = config.LEND_BTC
 
 # Rate to start our USD offers at, in percentage per year
-USD_START_RATE_PERCENT = Decimal("365.0")
+USD_START_RATE_PERCENT = config.USD_START_RATE_PERCENT
 
 # Don't reduce our USD offers below this rate, in percentage per year
-USD_MINIMUM_RATE_PERCENT = Decimal("YOU HAVE TO PICK THIS ONE YOURSELF")
+USD_MINIMUM_RATE_PERCENT = config.USD_MINIMUM_RATE_PERCENT
 
 # How often to reduce the rates on our unfilled USD offers
-USD_RATE_REDUCTION_INTERVAL = timedelta(hours=1)
+USD_RATE_REDUCTION_INTERVAL = config.USD_RATE_REDUCTION_INTERVAL
 
 # How much to reduce the rates on our unfilled USD offers, in percentage per
 # year
-USD_RATE_DECREMENT_PERCENT = Decimal("35.0")
+USD_RATE_DECREMENT_PERCENT = config.USD_RATE_DECREMENT_PERCENT
 
 # ADVANCED: Use this to reduce interest rates exponentially instead of
 # linearly. If you don't understand what this means, don't change this
@@ -54,27 +55,27 @@ USD_RATE_DECREMENT_PERCENT = Decimal("35.0")
 #
 # If you use this, you should set USD_RATE_DECREMENT_PERCENT to zero, otherwise
 # both reductions will be applied.
-USD_RATE_EXPONENTIAL_DECAY_MULTIPLIER = Decimal("1.0")
+USD_RATE_EXPONENTIAL_DECAY_MULTIPLIER = config.USD_RATE_EXPONENTIAL_DECAY_MULTIPLIER
 
 # How many days we're willing to lend our USD funds for
-USD_LEND_PERIOD_DAYS = 30
+USD_LEND_PERIOD_DAYS = config.USD_LEND_PERIOD_DAYS
 
 # Don't try to make USD offers smaller than this. Bitfinex currently doesn't
 # allow loan offers smaller than $50.
-USD_MINIMUM_LEND_AMOUNT = Decimal("50.0")
+USD_MINIMUM_LEND_AMOUNT = config.USD_MINIMUM_LEND_AMOUNT
 
 # Rate to start our BTC offers at, in percentage per year
-BTC_START_RATE_PERCENT = Decimal("20.0")
+BTC_START_RATE_PERCENT = config.BTC_START_RATE_PERCENT
 
 # Don't reduce our BTC offers below this rate, in percentage per year
-BTC_MINIMUM_RATE_PERCENT = Decimal("YOU HAVE TO PICK THIS ONE YOURSELF")
+BTC_MINIMUM_RATE_PERCENT = config.BTC_MINIMUM_RATE_PERCENT
 
 # How often to reduce the rates on our unfilled BTC offers
-BTC_RATE_REDUCTION_INTERVAL = timedelta(hours=1)
+BTC_RATE_REDUCTION_INTERVAL = config.BTC_RATE_REDUCTION_INTERVAL
 
 # How much to reduce the rates on our unfilled BTC offers, in percentage per
 # year
-BTC_RATE_DECREMENT_PERCENT = Decimal("2.0")
+BTC_RATE_DECREMENT_PERCENT = config.BTC_RATE_DECREMENT_PERCENT
 
 # ADVANCED: Use this to reduce interest rates exponentially instead of
 # linearly. If you don't understand what this means, don't change this
@@ -85,17 +86,17 @@ BTC_RATE_DECREMENT_PERCENT = Decimal("2.0")
 #
 # If you use this, you should set BTC_RATE_DECREMENT_PERCENT to zero, otherwise
 # both reductions will be applied.
-BTC_RATE_EXPONENTIAL_DECAY_MULTIPLIER = Decimal("1.0")
+BTC_RATE_EXPONENTIAL_DECAY_MULTIPLIER = config.BTC_RATE_EXPONENTIAL_DECAY_MULTIPLIER
 
 # How many days we're willing to lend our BTC funds for
-BTC_LEND_PERIOD_DAYS = 30
+BTC_LEND_PERIOD_DAYS = config.BTC_LEND_PERIOD_DAYS
 
 # Don't try to make BTC offers smaller than this. Bitfinex currently doesn't
 # allow loan offers smaller than $50.
-BTC_MINIMUM_LEND_AMOUNT = Decimal("0.25")
+BTC_MINIMUM_LEND_AMOUNT = config.BTC_MINIMUM_LEND_AMOUNT
 
 # How often to retrieve the current statuses of our offers
-POLL_INTERVAL = timedelta(minutes=5)
+POLL_INTERVAL = config.POLL_INTERVAL
 
 
 from itertools import count
