@@ -1,113 +1,15 @@
-"""
-Cascade lending bot for Bitfinex. Places lending offers at a high rate, then
-gradually lowers them until they're filled.
-
-This is intended as a proof of concept alternative to fractional reserve rate
-(FRR) loans. FRR lending heavily distorts the swap market on Bitfinex. My hope
-is that Bitfinex will remove the FRR, and implement an on-site version of this
-bot for lazy lenders (myself included) to use instead.
-
-Git repo: https://github.com/ah3dce/cascadebot
-Bitcoin tips: 1Fk1G8yVtXQLC1Eft4r1kS8e3SZyRaFwbM
-
-Requires Python 3 and the requests library:
-
-    https://pypi.python.org/pypi/requests/
-
-Fill in the parameters below, and then run it with:
-
-    python3 cascadebot.py
-
-"""
 from decimal import Decimal
 from datetime import datetime, timedelta
-import config
-
-# API key stuff
-BITFINEX_API_KEY = config.BITFINEX_API_KEY
-BITFINEX_API_SECRET = config.BITFINEX_API_SECRET
-
-# Set this to False if you don't want the bot to make USD offers
-LEND_USD = config.LEND_USD
-
-# Set this to False if you don't want the bot to make BTC offers
-LEND_BTC = config.LEND_BTC
-
-# Rate to start our USD offers at, in percentage per year
-USD_START_RATE_PERCENT = config.USD_START_RATE_PERCENT
-
-# Don't reduce our USD offers below this rate, in percentage per year
-USD_MINIMUM_RATE_PERCENT = config.USD_MINIMUM_RATE_PERCENT
-
-# How often to reduce the rates on our unfilled USD offers
-USD_RATE_REDUCTION_INTERVAL = config.USD_RATE_REDUCTION_INTERVAL
-
-# How much to reduce the rates on our unfilled USD offers, in percentage per
-# year
-USD_RATE_DECREMENT_PERCENT = config.USD_RATE_DECREMENT_PERCENT
-
-# ADVANCED: Use this to reduce interest rates exponentially instead of
-# linearly. If you don't understand what this means, don't change this
-# parameter (leave it at "1.0"). Interest rates will decay towards the minimum
-# value rather than towards zero:
-#
-#   new_rate = (current_rate - min_rate) * multiplier + min_rate
-#
-# If you use this, you should set USD_RATE_DECREMENT_PERCENT to zero, otherwise
-# both reductions will be applied.
-USD_RATE_EXPONENTIAL_DECAY_MULTIPLIER = config.USD_RATE_EXPONENTIAL_DECAY_MULTIPLIER
-
-# How many days we're willing to lend our USD funds for
-USD_LEND_PERIOD_DAYS = config.USD_LEND_PERIOD_DAYS
-
-# Don't try to make USD offers smaller than this. Bitfinex currently doesn't
-# allow loan offers smaller than $50.
-USD_MINIMUM_LEND_AMOUNT = config.USD_MINIMUM_LEND_AMOUNT
-
-# Rate to start our BTC offers at, in percentage per year
-BTC_START_RATE_PERCENT = config.BTC_START_RATE_PERCENT
-
-# Don't reduce our BTC offers below this rate, in percentage per year
-BTC_MINIMUM_RATE_PERCENT = config.BTC_MINIMUM_RATE_PERCENT
-
-# How often to reduce the rates on our unfilled BTC offers
-BTC_RATE_REDUCTION_INTERVAL = config.BTC_RATE_REDUCTION_INTERVAL
-
-# How much to reduce the rates on our unfilled BTC offers, in percentage per
-# year
-BTC_RATE_DECREMENT_PERCENT = config.BTC_RATE_DECREMENT_PERCENT
-
-# ADVANCED: Use this to reduce interest rates exponentially instead of
-# linearly. If you don't understand what this means, don't change this
-# parameter (leave it at "1.0"). Interest rates will decay towards the minimum
-# value rather than towards zero:
-#
-#   new_rate = (current_rate - min_rate) * multiplier + min_rate
-#
-# If you use this, you should set BTC_RATE_DECREMENT_PERCENT to zero, otherwise
-# both reductions will be applied.
-BTC_RATE_EXPONENTIAL_DECAY_MULTIPLIER = config.BTC_RATE_EXPONENTIAL_DECAY_MULTIPLIER
-
-# How many days we're willing to lend our BTC funds for
-BTC_LEND_PERIOD_DAYS = config.BTC_LEND_PERIOD_DAYS
-
-# Don't try to make BTC offers smaller than this. Bitfinex currently doesn't
-# allow loan offers smaller than $50.
-BTC_MINIMUM_LEND_AMOUNT = config.BTC_MINIMUM_LEND_AMOUNT
-
-# How often to retrieve the current statuses of our offers
-POLL_INTERVAL = config.POLL_INTERVAL
-
-
 from itertools import count
 import time
 import base64
 import json
 import hmac
 import hashlib
+import requests
 from collections import defaultdict, deque
 
-import requests
+import config
 
 
 class Offer(object):
@@ -148,15 +50,15 @@ class Offer(object):
         """
         min_rate, rate_decrement, decrement_interval = None, None, None
         if self.currency == "USD":
-            min_rate = USD_MINIMUM_RATE_PERCENT
-            rate_decrement = USD_RATE_DECREMENT_PERCENT
-            decay_multiplier = USD_RATE_EXPONENTIAL_DECAY_MULTIPLIER
-            decrement_interval = USD_RATE_REDUCTION_INTERVAL
+            min_rate = 0
+            rate_decrement = 1
+            decay_multiplier = 1
+            decrement_interval = 1
         elif self.currency == "BTC":
-            min_rate = BTC_MINIMUM_RATE_PERCENT
-            rate_decrement = BTC_RATE_DECREMENT_PERCENT
-            decay_multiplier = BTC_RATE_EXPONENTIAL_DECAY_MULTIPLIER
-            decrement_interval = BTC_RATE_REDUCTION_INTERVAL
+            min_rate = 1
+            rate_decrement = 1
+            decay_multiplier = 1
+            decrement_interval = 1
         else:
             raise Exception("Unrecognized currency string")
 
@@ -175,7 +77,6 @@ class Offer(object):
             # Asymptote at min_rate rather than at zero
             new_rate = (new_rate - min_rate) * decay_multiplier + min_rate
         return max(new_rate, min_rate)
-
 
 class BitfinexAPI(object):
     """
@@ -198,6 +99,9 @@ class BitfinexAPI(object):
         self.nonce = count(int(time.time()))
         self.request_timestamps = deque()
 
+    def get_lendbook(self, currency="USD"):
+        lendbook_data = self._request("v1/lendbook/{0}".format(currency))
+        return lendbook_data
     def get_offers(self):
         """
         Retrieve current offers.
@@ -362,68 +266,3 @@ def adjust_offers(api, offers, lend_period, minimum_amount):
         else:
             print("At rate {}, {} offer amount {} is below minimum,"
                   " skipping".format(rate, currency, amount))
-
-
-def go():
-    """
-    Main loop.
-
-    """
-    api = BitfinexAPI(BITFINEX_API_KEY, BITFINEX_API_SECRET)
-    print("Ctrl+C to quit")
-    while True:
-        start_time = datetime.utcnow()
-
-        usd_offers, btc_offers = api.get_offers()
-        print(usd_offers)
-        print(btc_offers)
-        if LEND_USD:
-            adjust_offers(api, usd_offers, USD_LEND_PERIOD_DAYS,
-                          USD_MINIMUM_LEND_AMOUNT)
-        if LEND_BTC:
-            adjust_offers(api, btc_offers, BTC_LEND_PERIOD_DAYS,
-                          BTC_MINIMUM_LEND_AMOUNT)
-
-        usd_available, btc_available = api.get_available_balances()
-        if LEND_USD and usd_available >= USD_MINIMUM_LEND_AMOUNT:
-            print(api.new_offer("USD", usd_available, USD_START_RATE_PERCENT,
-                                USD_LEND_PERIOD_DAYS))
-        if LEND_BTC and btc_available >= BTC_MINIMUM_LEND_AMOUNT:
-            print(api.new_offer("BTC", btc_available, BTC_START_RATE_PERCENT,
-                                BTC_LEND_PERIOD_DAYS))
-
-        end_time = datetime.utcnow()
-        elapsed = end_time - start_time
-        remaining = POLL_INTERVAL - elapsed
-        delay = max(remaining.total_seconds(), 0)
-        print("Done processing, sleeping for", delay, "seconds")
-        time.sleep(delay)
-
-
-go()
-
-
-# This is free and unencumbered software released into the public domain.
-#
-# Anyone is free to copy, modify, publish, use, compile, sell, or
-# distribute this software, either in source code form or as a compiled
-# binary, for any purpose, commercial or non-commercial, and by any
-# means.
-#
-# In jurisdictions that recognize copyright laws, the author or authors
-# of this software dedicate any and all copyright interest in the
-# software to the public domain. We make this dedication for the benefit
-# of the public at large and to the detriment of our heirs and
-# successors. We intend this dedication to be an overt act of
-# relinquishment in perpetuity of all present and future rights to this
-# software under copyright law.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-# IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-# OTHER DEALINGS IN THE SOFTWARE.
-#
-# For more information, please refer to <http://unlicense.org/>
