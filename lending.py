@@ -164,8 +164,15 @@ def go():
 
 def main():
     api = BitfinexAPI(BITFINEX_API_KEY, BITFINEX_API_SECRET)
-    print(api.get_lendbook())
-
+    lendbook = api.get_lendbook()
+    bids = lendbook['bids']
+    for bid in list(bids):
+        if bid['frr'] == 'Yes':
+            bids.pop()
+    for bid in bids:
+        if Decimal(bid['rate']) >= config.USD_MINIMUM_RATE_PERCENT:
+            print(bid)
+    print(api.get_available_balances())
 if __name__ == "__main__":
     main()
 

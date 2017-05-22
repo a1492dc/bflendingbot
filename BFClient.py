@@ -100,8 +100,8 @@ class BitfinexAPI(object):
         self.request_timestamps = deque()
 
     def get_lendbook(self, currency="USD"):
-        lendbook_data = self._request("/v1/lendbook/{0}".format(currency))
-        return lendbook_data
+        return self._get("/v1/lendbook/{0}".format(currency))
+
     def get_offers(self):
         """
         Retrieve current offers.
@@ -167,19 +167,57 @@ class BitfinexAPI(object):
         Retrieve available balances in deposit wallet.
 
         Returns:
-            A 2-tuple of the USD balance followed by the BTC balance.
+            A the USD balance available and amount.
 
         """
         balances_data = self._request("/v1/balances")
         usd_available = 0
-        btc_available = 0
+        usd_amount = 0
         for balance_data in balances_data:
             if balance_data["type"] == "deposit":
                 if balance_data["currency"] == "usd":
                     usd_available = Decimal(balance_data["available"])
-                elif balance_data["currency"] == "btc":
-                    btc_available = Decimal(balance_data["available"])
-        return (usd_available, btc_available)
+                    usd_amount = Decimal(balance_data["amount"])
+        # return balances_data
+        return (usd_available, usd_amount)
+
+    def _get(self, request_type, parameters=None):
+        self._rate_limiter()
+        url = self.base_url + request_type
+        if parameters is None:
+            parameters = {}
+        parameters.update({"request": request_type,
+                           "nonce": str(next(self.nonce))})
+        payload = base64.b64encode(json.dumps(parameters).encode())
+        signature = hmac.new(self.api_secret, payload, hashlib.sha384)
+        headers = {"X-BFX-APIKEY": self.api_key,
+                   "X-BFX-PAYLOAD": payload,
+                   "X-BFX-SIGNATURE": signature.hexdigest()}
+        request = None
+        retry_count = 0
+        while request is None:
+            status_string = None
+            try:
+                request = requests.get(url, headers=headers)
+            except requests.exceptions.ConnectionError:
+                status_string = "Connection failed,"
+            if request and request.status_code == 500:
+                request = None
+                status_string = "500 internal server error,"
+            if request is None:
+                delay = 2 ** retry_count
+                print(status_string, "sleeping for", delay,
+                      "seconds before retrying")
+                time.sleep(delay)
+                retry_count += 1
+                # I'm assuming that if we don't manage to connect, or we get a
+                # 500 internal server error, it doesn't count against our
+                # request limit. If this isn't the case, then we should call
+                # _rate_limiter() here too.
+        if request.status_code != 200:
+            print(request.text)
+            request.raise_for_status()
+        return request.json()
 
     def _request(self, request_type, parameters=None):
         self._rate_limiter()
