@@ -100,7 +100,7 @@ class BitfinexAPI(object):
         self.request_timestamps = deque()
 
     def get_lendbook(self, currency="USD"):
-        lendbook_data = self._request("v1/lendbook/{0}".format(currency))
+        lendbook_data = self._request("/v1/lendbook/{0}".format(currency))
         return lendbook_data
     def get_offers(self):
         """
